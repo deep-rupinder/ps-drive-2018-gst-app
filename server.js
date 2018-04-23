@@ -1,192 +1,152 @@
-var express=require('express');
-var mysql = require('mysql');
-var app = express();
+var Hapi = require('hapi');
+var Path = require('path');
+var mysql  = require('mysql');
+var server = new Hapi.Server();
 
-var bodyParser = require("body-parser");
-
-
-//LOGGER
-//var log4js = require('log4js');
-//log4js.configure('./config/log4js.json');
-//var log = log4js.getLogger("server");
-
-
-//STATIC FILES
-app.use(express.static('public'));
-//app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json()); // Body parser use JSON data
-
-/*MY SQL Connection Info*/
-var pool = mysql.createPool({
-	connectionLimit : 25,
-	host     : 'localhost',
-	user     : 'root',
-	password : 'user123',
-	database : 'db',
-	//port :'3307'
+server.connection({ 
+  port: 8001 
 });
 
-//log.debug('Server is starting....');
-
-//TEST CONNECTION
-pool.getConnection(function (err, connection) {
-	if (!err) {
-		console.log("Database is connected ... ");
-		//log.info('Database is connected ... ');
-		connection.release();
-	} else {
-		console.log("Error connecting database ... ");
-		//log.error('Error connecting database ... ');
-	}
-	console.log("releasing connection ... ");
+//connecting to database
+var connection = mysql.createConnection({
+  host     : 'localhost',
+  user     : 'root',
+  password : 'user123',
+  database : 'db',
+  
 });
 
-// ROOT - Loads Angular App
-app.get('/', function (req, res) {
-	res.sendFile( __dirname + "/" + "index.html" );
+//for including static files i.e css and js
+server.register(require('inert'), (err) => {
+
+  if (err) {
+    throw err;
+  }
+
+  server.route({
+    method: 'GET',
+    path: '/{param*}',
+    handler: {
+      directory: {
+        path: 'public'
+      }
+    }
+  });
+   server.start(function(){console.log('server is running');});
 });
 
-// This responds a GET request for the /list page.
-app.get('/api/list', function (req, res) {
-	console.log("GET Request :: /list");
-	//log.info('GET Request :: /list');
-	var data = {
-        "error": 1,
-        "products": ""
-    };
-	
-	pool.getConnection(function (err, connection) {
-		connection.query('SELECT * from products', function (err, rows, fields) {
-			connection.release();
 
-			if (rows.length !== 0 && !err) {
-				data["error"] = 0;
-				data["products"] = rows;
-				res.json(data);
-			} else if (rows.length === 0) {
-				//Error code 2 = no rows in db.
-				data["error"] = 2;
-				data["products"] = 'No products Found..';
-				res.json(data);
-			} else {
-				data["products"] = 'error while performing query';
-				res.json(data);
-				console.log('Error while performing Query: ' + err);
-				//log.error('Error while performing Query: ' + err);
-			}
-		});
-	
-	});
-});
-
-//UPDATE Product
-app.put('/api/update', function (req, res) {
-	//return ('hi");
-    var id = req.body.id;
-    var name = req.body.name;
-    var description = req.body.description;
-    var price = req.body.price;
-    var data = {
-        "error": 1,
-        "product": ""
-    };
-	console.log('PUT Request :: /update: ' + id);
-	//log.info('PUT Request :: /update: ' + id);
-    if (!!id && !!name && !!description && !!price) {
-		pool.getConnection(function (err, connection) {
-			connection.query("UPDATE products SET name = ?, description = ?, price = ? WHERE id=?",[name,  description, price, id], function (err, rows, fields) {
-				if (!!err) {
-					data["product"] = "Error Updating data";
-					console.log(err);
-					//log.error(err);
-				} else {
-					data["error"] = 0;
-					data["product"] = "Updated Book Successfully";
-					console.log("Updated: " + [id, name, description, price]);
-					//log.info("Updated: " + [id, name, description, price]);
-				}
-				res.json(data);
-			});
-		});
-    } else {
-        data["product"] = "Please provide all required data (i.e : id, name, desc, price)";
-        res.json(data);
+//test for checking routing
+ server.route({
+    path: '/aaa',
+    method: 'GET',
+    handler(req, reply) {
+        reply('Welcome to HapiJs!!');
     }
 });
 
-//LIST Product by ID
-app.get('/api/list/:id', function (req, res) {
-	var id = req.params.id;
+//to select all products from gst table
+server.route({
+    method: 'GET',
+    path: '/api/list',
+    handler: function (request, reply) {
+			var data = {
+        "error": 1,
+        "products": ""
+    };
+       connection.query('SELECT * from gst',
+       function (error, results, fields) {
+       if (error) throw error;
+		data["products"]=results;
+       reply(data);
+    });
+  }
+});
+
+//temparary database that store products present in cart of customer
+server.route({
+    method: 'GET',
+    path: '/api/list2',
+    handler: function (request, reply) {
+			var data = {
+        "error": 1,
+        "products": ""
+    };
+       connection.query('SELECT * from temp',
+       function (error, results, fields) {
+       if (error) throw error;
+		data["products"]=results;
+       reply(data);
+    });
+  }
+});
+
+//reply product corresponding to a particular id
+server.route({
+    method: 'GET',
+    path: '/api/list1',
+    handler: function (req, reply) {
+	var id = req.query.id;
+	//reply.file('aaa');
 	var data = {
         "error": 1,
         "product": ""
     };
-	
-	console.log("GET request :: /list/" + id);
-	//log.info("GET request :: /list/" + id);
-	pool.getConnection(function (err, connection) {
-		connection.query('SELECT * from products WHERE id = ?', id, function (err, rows, fields) {
-			connection.release();
-			
+	console.log(id);
+	connection.query('SELECT * from gst WHERE id = ?', id, function (err, rows, fields) {
 			if (rows.length !== 0 && !err) {
 				data["error"] = 0;
 				data["product"] = rows;
-				res.json(data);
+				reply(data);
 			} else {
 				data["product"] = 'No product Found..';
-				res.json(data);
 				console.log('Error while performing Query: ' + err);
-				//log.error('Error while performing Query: ' + err);
+				reply(data);
 			}
 		});
 	
-	});
-});
 
-//INSERT new product
-app.post('/api/insert', function (req, res) {
-    var name = req.body.name;
-    var description = req.body.description;
-    var price = req.body.price;
-    var data = {
-        "error": 1,
-        "products": ""
-    };
-	console.log('POST Request :: /insert: ');
-	//log.info('POST Request :: /insert: ');
-    if (!!name && !!description && !!price) {
-		pool.getConnection(function (err, connection) {
-			connection.query("INSERT INTO products SET name = ?, description = ?, price = ?",[name,  description, price], function (err, rows, fields) {
-				if (!!err) {
-					data["products"] = "Error Adding data";
-					console.log(err);
-					//log.error(err);
-				} else {
-					data["error"] = 0;
-					data["products"] = "Product Added Successfully";
-					console.log("Added: " + [name, description, price]);
-					//log.info("Added: " + [name, description, price]);
-				}
-				res.json(data);
-			});
-        });
-    } else {
-        data["products"] = "Please provide all required data (i.e : name, desc, price)";
-        res.json(data);
-    }
-});
-
-app.post('/api/delete', function (req, res) {
-    var id = req.body.id;
-    var data = {
+}});
+//reply product corresponding to a particular id(for tempary table)
+server.route({
+    method: 'GET',
+    path: '/api/list22',
+    handler: function (req, reply) {
+	var id = req.query.id;
+	//reply.file('aaa');
+	var data = {
         "error": 1,
         "product": ""
     };
-	console.log('DELETE Request :: /delete: ' + id);
-	//log.info('DELETE Request :: /delete: ' + id);
-    if (!!id) {
-		pool.getConnection(function (err, connection) {
-			connection.query("DELETE FROM products WHERE id=?",[id],function (err, rows, fields) {
+	console.log(id);
+	connection.query('SELECT * from temp WHERE id = ?', id, function (err, rows, fields) {			
+			if (rows.length !== 0 && !err) {
+				data["error"] = 0;
+				data["product"] = rows;
+				reply(data);
+			} else {
+				data["product"] = 'No product Found..';
+				
+				console.log('Error while performing Query: ' + err);
+				reply(data);
+			}
+		});
+	
+
+}});
+
+//delete product from database
+server.route({
+    method: 'GET',
+    path: '/api/delete',
+    handler: function (req, reply) {
+	var id = req.query.id;
+	var data = {
+        "error": 1,
+        "product": ""
+    };
+console.log(id);
+connection.query("DELETE FROM gst WHERE id=?",[id],function (err, rows, fields) {
 				if (!!err) {
 					data["product"] = "Error deleting data";
 					console.log(err);
@@ -197,20 +157,247 @@ app.post('/api/delete', function (req, res) {
 					console.log("Deleted: " + id);
 					//log.info("Deleted: " + id);
 				}
-				res.json(data);
+				reply(data);
 			});
-		});
-    } else {
-        data["product"] = "Please provide all required data (i.e : id ) & must be a integer";
-        res.json(data);
+	
+
+}});
+
+//delete product from temparary table
+server.route({
+    method: 'GET',
+    path: '/api/delete1',
+    handler: function (req, reply) {
+	var id = req.query.id;
+	var data = {
+        "error": 1,
+        "product": ""
+    };
+	console.log(id);
+connection.query("DELETE FROM temp WHERE id=?",[id],function (err, rows, fields) {
+				if (!!err) {
+					data["product"] = "Error deleting data";
+					console.log(err);
+					//log.error(err);
+				} else {
+					data["product"] = 0;
+					data["product"] = "Delete product Successfully";
+					console.log("Deleted: " + id);
+					//log.info("Deleted: " + id);
+				}
+				reply(data);
+			});
+}});
+
+//update product information
+server.route({
+    method: 'GET',
+    path: '/api/update',
+    handler: function (req, reply) {
+    var id = req.query.id;
+    var code = req.query.code;
+	var price = req.query.price;
+    var gst = req.query.gst;
+    var name = req.query.name;
+    var data = {
+        "error": 1,
+        "product": ""
+    };
+    if (!!id && !!name && !!code&&!!gst && !!price) {
+	
+			connection.query("UPDATE gst SET name = ?, code = ?, price = ?,gst= ? WHERE id=?",[name, code, price,gst,id], function (err, rows, fields) {
+				if (!!err) {
+					data["product"] = "Error Updating data";
+					console.log(err);
+				} else {
+					data["error"] = 0;
+					data["product"] = "Updated product Successfully";
+					console.log("Updated: " + [id, name, code, price,gst]);
+				}
+				reply(data);
+			});
+		   } else {
+        data["product"] = "Please provide all required data (i.e : id, name, desc, price)";
+        reply(data);
+    }
+	}});
+	
+	//update quantity in temporary table if user change quantity
+	server.route({
+    method: 'GET',
+    path: '/api/update1',
+    handler: function (req, reply) {
+    var id = req.query.id;
+    var qty = req.query.qty; 
+    console.log(qty);
+    var data = {
+        "error": 1,
+        "product": ""
+    };
+    if (!!id&&!!qty) {
+			connection.query("UPDATE temp SET qty= ? WHERE id=?",[qty,id], function (err, rows, fields) {
+				if (!!err) {
+					data["product"] = "Error Updating data";
+					console.log(err);
+				} else {
+					data["error"] = 0;
+					data["product"] = "Updated product Successfully";
+					
+			
+				}
+				reply(data);
+			});
+		   } else {
+        data["product"] = "Please provide all required data (i.e : id, name, desc, price)";
+        reply(data);
+    }
+	}});
+	
+	//add a new product to database
+	server.route({
+    method: 'GET',
+    path: '/api/insert',
+    handler: function (req, reply) {
+    
+    var code = req.query.code;
+	var price = req.query.price;
+    var gst = req.query.gst;
+   var name = req.query.name;
+
+	console.log(name);
+	console.log(price);
+	console.log(gst);
+	console.log(code);
+	//console.log(description);
+    var data = {
+        "error": 1,
+        "product": ""
+    };
+    if (!!name && !!code&&!!gst && !!price) {
+			connection.query("INSERT INTO gst SET name = ?, code = ?, price = ?,gst=?",[name, code, price,gst], function (err, rows, fields) {
+				if (!!err) {
+					data["product"] = "Error Updating data";
+					console.log(err);
+				} else {
+					data["error"] = 0;
+					data["product"] = "Updated Book Successfully";
+					console.log("Updated: " + [ name, code, price]);
+				}
+				reply(data);
+			});
+		   } else {
+        data["product"] = "Please provide all required data (i.e : id, name, desc, price)";
+        reply(data);
+    }
+	}});
+	
+	//to search a product
+	server.route({
+    method: 'GET',
+    path: '/api/search',
+    handler: function (req, reply) {
+    var code = req.query.code;
+   var name = req.query.name;
+	var qty=req.query.qty;
+	console.log(name);
+	console.log(code);
+	console.log(qty);
+	//console.log(description);
+    var data = {
+        "error": 1,
+        "product": ""
+    };
+    if (!!name) {
+	console.log("from name");
+			connection.query("select * from gst where name = ?",[name], function (err, rows, fields) {
+				if (!!err) {
+					//data["product"] = "Error finding product data";
+					console.log(err);
+				} 
+				else {
+					//data["error"] = 0;
+					data["product"] = rows;
+					connection.query("INSERT INTO temp SET id =? ,qty=?,name=?,price=?,gst=?,code=?",[data.product[0].id,qty,data.product[0].name,data.product[0].price,data.product[0].gst,data.product[0].code]);
+					console.log("Updated: " + [ name, code]);
+				
+				}
+				reply(data);
+			});
+		   } 
+		   else if(!!code)
+		   {	console.log("from code");
+			   
+			   connection.query("select * from gst where code = ?",[code], function (err, rows, fields) {
+				if (!!err) {
+					data["product"] = "Error finding product data";
+					console.log(err);
+				}
+				else {
+					data["error"] = 0;
+					
+					data["product"] = rows;
+					connection.query("INSERT INTO temp SET id =? ,qty=?,name=?,price=?,gst=?,code=?",[data.product[0].id,qty,data.product[0].name,data.product[0].price,data.product[0].gst,data.product[0].code]);
+					console.log("inserted: " + [data.product[0].name ]);
+			
+				}
+				reply(data);
+			});
+		   }
+			   
+		   else {
+        data["product"] = "Please provide all required data (i.e : id, name, desc, price)";
+        reply(data);
+    }
+	}});
+	//render main page
+server.route({
+    method: 'GET',
+    path: '/',
+    handler: function(request, reply) {
+        reply.file('./public/index.html');
+
     }
 });
 
-var server = app.listen(8081, function () {
+//to generate total bill
+server.route({
+    method: 'GET',
+    path: '/api/calc',
+    handler: function(request, reply) {
+	  var data = {
+        "error": 1,
+        "product": ""
+    };
+	
+     connection.query("select (sum(price*qty)+sum(price*qty*gst/100)) as val from temp", function (err, rows, fields) {
+				if (!!err) {
+					data["product"] = "Error finding product data";
+					console.log(err);
+				} 
+				
+					
+				else {
+					data["error"] = 0;
+					
+					data["product"] = rows;
+					connection.query("truncate table temp");
+					console.log(data.product[0])
+					
+			
+				}
+				reply(data);
 
-  var host = server.address().address;
-  var port = server.address().port;
+    })
+}});
 
-  console.log("dummy app listening at: " + host + ":" + port);
 
-})
+//to render billing page
+server.route({
+    method: 'GET',
+    path: '/bill',
+    handler: function(request, reply) {
+		console.log("inside index2");
+        reply.file('./public/index2.html');
+
+    }
+});
