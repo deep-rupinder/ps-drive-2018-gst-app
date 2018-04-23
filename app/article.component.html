@@ -1,0 +1,54 @@
+
+<h3 *ngIf="ProductIdToUpdate; else create"> 
+   Update product for Id: {{productIdToUpdate}}
+</h3>
+<ng-template #create>
+   <h3> Create New Arti </h3>
+</ng-template>
+<div>
+ <form [formGroup]="productForm" (ngSubmit)="onproductFormSubmit()">
+  <table>
+    <tr><td>Enter Title</td><td><input formControlName="title">
+	       <label *ngIf="productForm.get('title').invalid && processValidation" [ngClass] = "'error'"> Title is required. </label>
+   	</td></tr>
+    <tr><td>Enter Category</td><td><input formControlName="category">
+	       <label *ngIf="productForm.get('category').invalid && processValidation" [ngClass] = "'error'"> Category is required. </label>
+	</td></tr>	
+    <tr><td colspan="2">
+	    <button *ngIf="!productIdToUpdate">CREATE</button>  
+		<button *ngIf="productIdToUpdate">UPDATE</button>  
+	    <button (click)="backToCreateproduct()" *ngIf="productIdToUpdate">Go Back</button>  
+	</td></tr>
+  </table>
+ </form> 
+ <br/>
+ <div *ngIf="statusCode; else processing">
+   <div *ngIf="statusCode === 201" [ngClass] = "'success'">
+	    product added successfully.
+   </div>   
+   <div *ngIf="statusCode === 409" [ngClass] = "'success'">
+        product already exists.
+   </div>   	
+   <div *ngIf="statusCode === 200" [ngClass] = "'success'">
+        product updated successfully.
+   </div>   	      
+   <div *ngIf="statusCode === 204" [ngClass] = "'success'">
+        product deleted successfully.
+   </div>   	   
+   <div *ngIf="statusCode === 500" [ngClass] = "'error'">
+        Internal Server Error.
+   </div>	
+ </div>
+ <ng-template #processing>
+	<img *ngIf="requestProcessing" src="assets/images/loading.gif">
+ </ng-template>
+</div>
+<h3>product Details</h3>
+<table>
+  <tr><th> Id</th> <th>Title</th><th>Category</th><th></th><th></th></tr>
+  <tr *ngFor="let product of allproducts" >
+    <td>{{product.id}}</td> <td>{{product.title}}</td> <td>{{product.category}}</td>
+	<td><button type="button" (click)="loadproductToEdit(product.id)">Edit</button> </td> 
+	<td><button type="button" (click)="deleteproduct(product.id)">Delete</button></td>
+  </tr>
+</table>
